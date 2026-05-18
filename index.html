@@ -104,7 +104,7 @@
                     </button>
                 </div>
                 
-                <div class="flex gap-3">
+                <div class="flex flex-wrap gap-3">
                     <!-- 載入影片按鈕 -->
                     <button id="loadBtn" 
                         class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 flex-grow lg:flex-grow-0 whitespace-nowrap">
@@ -130,7 +130,7 @@
                         <!-- 實際 YouTube Player -->
                         <div id="player"></div>
                         
-                        <!-- 純享音樂模式遮罩層 (預設隱藏) -->
+                        <!-- 純享音樂模式遮罩層 -->
                         <div id="musicModeOverlay" class="music-mode-overlay flex-col items-center justify-center bg-slate-950/95 hidden z-10 select-none">
                             <div class="relative w-48 h-48 md:w-56 md:h-56 flex items-center justify-center">
                                 <!-- 黑膠唱片外盤 -->
@@ -139,7 +139,7 @@
                                     <div class="absolute inset-4 rounded-full border border-neutral-700 opacity-40"></div>
                                     <div class="absolute inset-8 rounded-full border border-neutral-700 opacity-30"></div>
                                     <div class="absolute inset-12 rounded-full border border-neutral-700 opacity-20"></div>
-                                    <!-- 唱片中心封面圖 (動態讀取當前播放影片縮圖) -->
+                                    <!-- 唱片中心封面圖 -->
                                     <div class="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-slate-800 bg-slate-800">
                                         <img id="vinylCover" src="" class="w-full h-full object-cover" alt="Cover">
                                     </div>
@@ -203,8 +203,18 @@
                         <!-- 播放清單項目會被動態注入此處 -->
                     </div>
 
-                    <div class="p-4 bg-slate-900/50 border-t border-slate-700 text-center">
-                        <p class="text-xs text-slate-500">
+                    <!-- 說明圖例 -->
+                    <div class="p-3 bg-slate-900/80 border-t border-slate-700 text-xs text-slate-400 space-y-1">
+                        <p class="font-semibold text-slate-300"><i class="fas fa-ghost mr-1 text-blue-400"></i> 幽靈模式說明：</p>
+                        <ul class="list-disc list-inside space-y-0.5 pl-1 text-[11px] text-slate-400">
+                            <li><span class="text-blue-400 font-bold">藍色（一次性）</span>：播放完畢後自動移除。</li>
+                            <li><span class="text-slate-400 font-bold">灰色（常態保留）</span>：正常參與每輪循環播放。</li>
+                            <li><span class="text-red-400 font-bold">紅色（低調保留）</span>：若清單內有藍色歌，輪播時會<span class="underline">自動跳過</span>紅色歌，直到藍色歌全部清空後才恢復播放。</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="p-3 bg-slate-950/50 border-t border-slate-800 text-center">
+                        <p class="text-[11px] text-slate-500">
                             <i class="fas fa-info-circle mr-1"></i> 拖曳影片左側可調整播放順序
                         </p>
                     </div>
@@ -230,8 +240,8 @@
                     <span class="count-num">1</span>
                 </button>
 
-                <!-- 按鈕 4: 一次性 (Ghost 幽靈代表播放完自動移除) -->
-                <button class="once-btn w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-xs transition-colors" title="一次性播放 (結束後移除)">
+                <!-- 按鈕 4: 三態幽靈 (Once / Keep / Stealth) -->
+                <button class="ghost-btn w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-xs transition-colors" title="切換幽靈模式">
                     <i class="fas fa-ghost"></i>
                 </button>
 
@@ -288,11 +298,9 @@
         }
 
         function onPlayerStateChange(event) {
-            // YT.PlayerState.ENDED = 0, PLAYING = 1, PAUSED = 2
             if (event.data === YT.PlayerState.ENDED) {
                 handleVideoEnd();
             }
-            
             // 同步音樂模式視覺動畫與實際播放狀態
             updateVisualizerAnimation(event.data);
         }
@@ -320,6 +328,11 @@
             }
         }
 
+        // 檢查歌單中是否存在「藍色幽靈（一次性）」歌曲
+        function hasBlueGhosts() {
+            return playlist.some(video => video.ghostState === 'once');
+        }
+
         // --- 播放核心邏輯 ---
         function handleVideoEnd() {
             if (currentIndex === -1) return;
@@ -337,8 +350,8 @@
             // 本輪次數播放完畢
             currentRepeatCount = 0;
 
-            // 處理一次性播放邏輯 (播完後自動移除)
-            if (video.once) {
+            // 處理一次性播放邏輯 (藍色: 播完後自動移除)
+            if (video.ghostState === 'once') {
                 const idToRemove = video.id;
                 playNext(true); // 特別通知 playNext 當前影片已被移除
                 removeFromPlaylist(idToRemove);
@@ -355,22 +368,67 @@
             }
 
             const currentVideo = playlist[currentIndex];
-            
+            const hasBlue = hasBlueGhosts();
+
+            // 過濾出目前可以播放的候選清單 (若有藍色歌，則排除紅色'stealth'歌)
+            const getPlayableIndices = () => {
+                let list = [];
+                playlist.forEach((v, idx) => {
+                    if (hasBlue && v.ghostState === 'stealth') {
+                        // 有藍色歌，跳過紅色歌
+                        return;
+                    }
+                    list.push(idx);
+                });
+                return list;
+            };
+
+            const playableIndices = getPlayableIndices();
+
+            if (playableIndices.length === 0) {
+                // 如果全都不能播(極端情況)，就播第一個
+                currentIndex = 0;
+                loadVideo(currentIndex);
+                return;
+            }
+
             if (currentVideo && currentVideo.random) {
-                // 如果開啟隨機模式，隨機抽選與目前不同首的歌
-                if (playlist.length > 1) {
+                // 隨機播放邏輯 (必須符合過濾條件)
+                if (playableIndices.length > 1) {
                     let nextIdx = currentIndex;
-                    while(nextIdx === currentIndex) {
-                        nextIdx = Math.floor(Math.random() * playlist.length);
+                    // 隨機挑選，且盡量與目前不同首
+                    let attempts = 0;
+                    while ((nextIdx === currentIndex || !playableIndices.includes(nextIdx)) && attempts < 20) {
+                        nextIdx = playableIndices[Math.floor(Math.random() * playableIndices.length)];
+                        attempts++;
                     }
                     currentIndex = nextIdx;
+                } else {
+                    currentIndex = playableIndices[0];
                 }
             } else {
-                // 循序播放。如果當前曲目剛被刪除，直接載入原 index 即可
-                if (!wasDeleted) {
-                    currentIndex = (currentIndex + 1) % playlist.length;
+                // 循序播放邏輯 (跳過不可播放的紅色歌曲)
+                let startSearchIdx = currentIndex;
+                if (wasDeleted) {
+                    // 如果當前播完被刪了，下一首的 index 自動遞補上來
+                    if (startSearchIdx >= playlist.length) startSearchIdx = 0;
                 } else {
-                    if (currentIndex >= playlist.length) currentIndex = 0;
+                    startSearchIdx = (startSearchIdx + 1) % playlist.length;
+                }
+
+                let found = false;
+                // 循序往後找，找到第一個符合 playableIndices 的位置
+                for (let i = 0; i < playlist.length; i++) {
+                    let checkIdx = (startSearchIdx + i) % playlist.length;
+                    if (playableIndices.includes(checkIdx)) {
+                        currentIndex = checkIdx;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    currentIndex = playableIndices[0];
                 }
             }
 
@@ -393,7 +451,7 @@
             document.getElementById('currentTitle').innerText = video.title;
             document.getElementById('errorDisplay').classList.add('hidden');
             
-            // 同步黑膠唱片封面圖 (使用 YouTube 高清預覽縮圖)
+            // 同步黑膠唱片封面圖
             document.getElementById('vinylCover').src = `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`;
 
             updateUI();
@@ -412,7 +470,7 @@
                 youtubeId: ytId,
                 title: `載入中: ${ytId}`,
                 repeats: 1, 
-                once: true,
+                ghostState: 'once', // 三態：'once' (藍色/一次性), 'keep' (灰色/保留), 'stealth' (紅色/低調保留)
                 random: false
             };
 
@@ -425,7 +483,7 @@
                 loadVideo(0);
             }
 
-            // 抓取影片 OEmbed 資訊以取得正確標題
+            // 抓取影片 OEmbed 資訊
             fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytId}&format=json`)
                 .then(res => res.json())
                 .then(data => {
@@ -471,6 +529,7 @@
             const container = document.getElementById('playlist');
             container.innerHTML = '';
             const template = document.getElementById('video-item-template');
+            const hasBlue = hasBlueGhosts();
 
             playlist.forEach((video, index) => {
                 const clone = template.content.cloneNode(true);
@@ -481,11 +540,19 @@
                     root.classList.add('ring-2', 'ring-blue-500', 'bg-blue-900/20');
                 }
 
-                root.querySelector('.title').innerText = video.title;
-                root.querySelector('.title').onclick = () => loadVideo(index);
-                root.querySelector('.title').classList.add('cursor-pointer');
+                // 標題與低調模式下的視覺弱化
+                const titleEl = root.querySelector('.title');
+                titleEl.innerText = video.title;
+                titleEl.onclick = () => loadVideo(index);
+                titleEl.classList.add('cursor-pointer');
 
-                // 按鈕控制
+                if (hasBlue && video.ghostState === 'stealth') {
+                    // 因為有藍色歌存在，此紅色低調歌目前處於「避讓/跳過」狀態，UI呈現半透明與暗色
+                    root.classList.add('opacity-40');
+                    titleEl.title = "目前有一次性歌曲播放中，此低調保留歌曲會自動被跳過";
+                }
+
+                // 按鈕控制 - 重複次數
                 const repBtn = root.querySelector('.repeat-btn');
                 const repNum = repBtn.querySelector('.count-num');
                 repNum.innerText = video.repeats;
@@ -498,14 +565,38 @@
                     renderPlaylist();
                 };
 
-                const onceBtn = root.querySelector('.once-btn');
-                if (video.once) onceBtn.classList.add('text-blue-400');
-                else onceBtn.classList.add('text-slate-500');
-                onceBtn.onclick = () => {
-                    video.once = !video.once;
+                // 按鈕控制 - 三態幽靈
+                const ghostBtn = root.querySelector('.ghost-btn');
+                
+                // 清理舊的顏色 class
+                ghostBtn.className = "ghost-btn w-8 h-8 flex items-center justify-center rounded text-xs transition-colors ";
+                
+                if (video.ghostState === 'once') {
+                    // 藍色：一次性
+                    ghostBtn.classList.add('bg-blue-600/30', 'text-blue-400', 'hover:bg-blue-600/40');
+                    ghostBtn.title = "一次性：播放完畢後自動移除";
+                } else if (video.ghostState === 'keep') {
+                    // 灰色：一般保留
+                    ghostBtn.classList.add('bg-slate-700', 'text-slate-500', 'hover:bg-slate-600');
+                    ghostBtn.title = "常態保留：正常循環播放";
+                } else if (video.ghostState === 'stealth') {
+                    // 紅色：低調保留
+                    ghostBtn.classList.add('bg-red-600/30', 'text-red-400', 'hover:bg-red-600/40');
+                    ghostBtn.title = "低調保留：有一次性(藍色)歌曲在清單中時會被跳過";
+                }
+
+                ghostBtn.onclick = () => {
+                    if (video.ghostState === 'once') {
+                        video.ghostState = 'keep';
+                    } else if (video.ghostState === 'keep') {
+                        video.ghostState = 'stealth';
+                    } else {
+                        video.ghostState = 'once';
+                    }
                     renderPlaylist();
                 };
 
+                // 按鈕控制 - 隨機
                 const randBtn = root.querySelector('.random-btn');
                 if (video.random) randBtn.classList.add('text-green-400');
                 else randBtn.classList.add('text-slate-500');
