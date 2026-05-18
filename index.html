@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>YouTube Player Ultra - 播放輔助</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f1f5f9;
+        }
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 比例 */
+            height: 0;
+            overflow: hidden;
+            border-radius: 0.75rem;
+            background: #000;
+        }
+        .video-container iframe, .video-placeholder, .music-mode-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 10px;
+        }
+        .ghost-card {
+            opacity: 0.5;
+            background: #334155 !important;
+        }
+        
+        /* 黑膠唱片旋轉動畫 */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .vinyl-spin {
+            animation: spin 15s linear infinite;
+        }
+        .vinyl-paused {
+            animation-play-state: paused;
+        }
+
+        /* 虛擬音波跳動動畫 */
+        @keyframes bounce-wave {
+            0%, 100% { height: 8px; }
+            50% { height: 42px; }
+        }
+        .wave-bar {
+            width: 4px;
+            background-color: #38bdf8;
+            border-radius: 2px;
+            animation: bounce-wave 1.2s ease-in-out infinite;
+        }
+        .wave-bar:nth-child(2) { animation-delay: 0.15s; animation-duration: 1.4s; }
+        .wave-bar:nth-child(3) { animation-delay: 0.3s; animation-duration: 1.1s; }
+        .wave-bar:nth-child(4) { animation-delay: 0.45s; animation-duration: 1.3s; }
+        .wave-bar:nth-child(5) { animation-delay: 0.1s; animation-duration: 1.5s; }
+        .wave-bar:nth-child(6) { animation-delay: 0.25s; animation-duration: 1.2s; }
+        .wave-bar:nth-child(7) { animation-delay: 0.4s; animation-duration: 1.6s; }
+        
+        .wave-paused {
+            animation-play-state: paused !important;
+            height: 8px !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- A. Header & Input Section -->
+        <header class="mb-8 border-b border-slate-700 pb-6">
+            <h1 class="text-3xl font-bold mb-6 flex items-center gap-3 text-white">
+                <i class="fab fa-youtube text-red-500 text-4xl"></i>
+                YouTube Player Ultra
+            </h1>
+            
+            <div class="flex flex-col lg:flex-row gap-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700 shadow-xl">
+                <!-- 網址輸入框 -->
+                <div class="relative flex-grow">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                        <i class="fab fa-youtube"></i>
+                    </span>
+                    <input type="text" id="videoInput" 
+                        class="block w-full pl-10 pr-12 py-3 bg-slate-900 border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-white placeholder-slate-500" 
+                        placeholder="請貼上影片網址...">
+                    <button id="pasteBtn" title="從剪貼簿貼上"
+                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white transition-colors">
+                        <i class="far fa-paste text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="flex gap-3">
+                    <!-- 載入影片按鈕 -->
+                    <button id="loadBtn" 
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 flex-grow lg:flex-grow-0 whitespace-nowrap">
+                        <i class="fas fa-plus"></i> 載入影片
+                    </button>
+
+                    <!-- 純享音樂模式切換開關 -->
+                    <button id="musicModeToggle" 
+                        class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-3 px-6 rounded-lg transition-all flex items-center justify-center gap-2 border border-slate-600 active:scale-95 whitespace-nowrap"
+                        title="隱藏影片畫面，進入純音樂純享視覺">
+                        <i class="fas fa-headphones text-lg"></i>
+                        <span>純享音樂模式: 關</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- B. Left: Player Section -->
+            <div class="lg:col-span-7 xl:col-span-8">
+                <div class="sticky top-8">
+                    <div class="video-container shadow-2xl border border-slate-700">
+                        <!-- 實際 YouTube Player -->
+                        <div id="player"></div>
+                        
+                        <!-- 純享音樂模式遮罩層 (預設隱藏) -->
+                        <div id="musicModeOverlay" class="music-mode-overlay flex-col items-center justify-center bg-slate-950/95 hidden z-10 select-none">
+                            <div class="relative w-48 h-48 md:w-56 md:h-56 flex items-center justify-center">
+                                <!-- 黑膠唱片外盤 -->
+                                <div id="vinylRecord" class="absolute inset-0 rounded-full bg-neutral-900 border-4 border-neutral-800 shadow-2xl flex items-center justify-center vinyl-spin vinyl-paused">
+                                    <!-- 唱片紋路 -->
+                                    <div class="absolute inset-4 rounded-full border border-neutral-700 opacity-40"></div>
+                                    <div class="absolute inset-8 rounded-full border border-neutral-700 opacity-30"></div>
+                                    <div class="absolute inset-12 rounded-full border border-neutral-700 opacity-20"></div>
+                                    <!-- 唱片中心封面圖 (動態讀取當前播放影片縮圖) -->
+                                    <div class="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-slate-800 bg-slate-800">
+                                        <img id="vinylCover" src="" class="w-full h-full object-cover" alt="Cover">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 躍動音波 -->
+                            <div class="flex items-end justify-center gap-1.5 h-12 mt-6">
+                                <div class="wave-bar wave-paused"></div>
+                                <div class="wave-bar wave-paused"></div>
+                                <div class="wave-bar wave-paused"></div>
+                                <div class="wave-bar wave-paused"></div>
+                                <div class="wave-bar wave-paused"></div>
+                                <div class="wave-bar wave-paused"></div>
+                                <div class="wave-bar wave-paused"></div>
+                            </div>
+                            
+                            <p class="text-sm text-sky-400 font-medium mt-4 tracking-wider flex items-center gap-1.5">
+                                <span class="relative flex h-2.5 w-2.5">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-500"></span>
+                                </span>
+                                純享音樂模式運行中
+                            </p>
+                        </div>
+
+                        <!-- 初始空狀態佔位符 -->
+                        <div id="placeholder" class="video-placeholder flex flex-col items-center justify-center text-slate-500 gap-4">
+                            <i class="fab fa-youtube text-6xl opacity-20"></i>
+                            <p class="text-lg font-medium opacity-50">等待播放清單載入...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 錯誤訊息提示區 -->
+                    <div id="errorDisplay" class="mt-4 p-4 bg-red-900/30 border border-red-500/50 rounded-lg text-red-200 hidden">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        <span id="errorMsg"></span>
+                    </div>
+
+                    <!-- 正在播放卡片 -->
+                    <div id="currentInfo" class="mt-6 p-6 bg-slate-800/30 rounded-xl border border-slate-700 hidden">
+                        <span class="text-blue-400 text-sm font-bold uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fas fa-music"></i> 正在播放
+                        </span>
+                        <h2 id="currentTitle" class="text-xl font-semibold mt-1 text-white"></h2>
+                    </div>
+                </div>
+            </div>
+
+            <!-- C. Right: Playlist Section -->
+            <div class="lg:col-span-5 xl:col-span-4">
+                <div class="bg-slate-800 rounded-2xl border border-slate-700 shadow-xl overflow-hidden flex flex-col max-h-[80vh]">
+                    <div class="p-4 border-b border-slate-700 bg-slate-800/80 backdrop-blur flex justify-between items-center">
+                        <h3 class="font-bold flex items-center gap-2">
+                            <i class="fas fa-list-ul text-blue-400"></i> 待播清單
+                        </h3>
+                        <span id="playlistCount" class="bg-slate-700 text-xs px-2 py-1 rounded-full text-slate-300">0</span>
+                    </div>
+                    
+                    <div id="playlist" class="flex-grow overflow-y-auto p-4 space-y-3 custom-scrollbar min-h-[300px]">
+                        <!-- 播放清單項目會被動態注入此處 -->
+                    </div>
+
+                    <div class="p-4 bg-slate-900/50 border-t border-slate-700 text-center">
+                        <p class="text-xs text-slate-500">
+                            <i class="fas fa-info-circle mr-1"></i> 拖曳影片左側可調整播放順序
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- UI 模板 -->
+    <template id="video-item-template">
+        <div class="video-item group flex items-center gap-3 p-3 bg-slate-900 border border-slate-700 rounded-xl transition-all hover:border-slate-500 hover:bg-slate-800/80">
+            <div class="handle cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400 p-1">
+                <i class="fas fa-grip-vertical"></i>
+            </div>
+            
+            <div class="flex-grow min-w-0">
+                <h4 class="title text-sm font-medium truncate text-slate-200">影片載入中...</h4>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <!-- 按鈕 1: 重複次數 -->
+                <button class="repeat-btn w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-xs transition-colors" title="重複次數">
+                    <span class="count-num">1</span>
+                </button>
+
+                <!-- 按鈕 4: 一次性 (Ghost 幽靈代表播放完自動移除) -->
+                <button class="once-btn w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-xs transition-colors" title="一次性播放 (結束後移除)">
+                    <i class="fas fa-ghost"></i>
+                </button>
+
+                <!-- 按鈕 3: 隨機播放 -->
+                <button class="random-btn w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-xs transition-colors" title="播放後隨機跳轉">
+                    <i class="fas fa-random"></i>
+                </button>
+
+                <!-- 按鈕 2: 移除 -->
+                <button class="delete-btn w-8 h-8 flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors" title="移除影片">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        // --- 狀態管理 ---
+        let playlist = [];
+        let player = null;
+        let currentIndex = -1;
+        let currentRepeatCount = 0;
+        let isPlayerReady = false;
+        let isMusicMode = false; // 是否開啟純音樂模式
+
+        // --- YouTube API 初始化 ---
+        const tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('player', {
+                height: '100%',
+                width: '100%',
+                playerVars: {
+                    'autoplay': 0,
+                    'controls': 1,
+                    'modestbranding': 1,
+                    'rel': 0,
+                    'origin': window.location.origin
+                },
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange,
+                    'onError': onPlayerError
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            isPlayerReady = true;
+            document.getElementById('placeholder').style.display = 'flex';
+        }
+
+        function onPlayerStateChange(event) {
+            // YT.PlayerState.ENDED = 0, PLAYING = 1, PAUSED = 2
+            if (event.data === YT.PlayerState.ENDED) {
+                handleVideoEnd();
+            }
+            
+            // 同步音樂模式視覺動畫與實際播放狀態
+            updateVisualizerAnimation(event.data);
+        }
+
+        function onPlayerError(event) {
+            let msg = "影片加載出錯。";
+            if (event.data === 101 || event.data === 150) {
+                msg = "版權方禁止在此環境嵌入。自動跳至下一首。";
+            }
+            showError(msg);
+            setTimeout(playNext, 3000);
+        }
+
+        // 控制音波與唱片的動畫狀態
+        function updateVisualizerAnimation(playerState) {
+            const vinyl = document.getElementById('vinylRecord');
+            const waves = document.querySelectorAll('.wave-bar');
+            
+            if (playerState === YT.PlayerState.PLAYING) {
+                vinyl.classList.remove('vinyl-paused');
+                waves.forEach(wave => wave.classList.remove('wave-paused'));
+            } else {
+                vinyl.classList.add('vinyl-paused');
+                waves.forEach(wave => wave.classList.add('wave-paused'));
+            }
+        }
+
+        // --- 播放核心邏輯 ---
+        function handleVideoEnd() {
+            if (currentIndex === -1) return;
+            const video = playlist[currentIndex];
+            currentRepeatCount++;
+
+            // 處理影片重播設定
+            const targetRepeats = video.repeats === '∞' ? Infinity : parseInt(video.repeats);
+            
+            if (currentRepeatCount < targetRepeats) {
+                player.playVideo();
+                return;
+            }
+
+            // 本輪次數播放完畢
+            currentRepeatCount = 0;
+
+            // 處理一次性播放邏輯 (播完後自動移除)
+            if (video.once) {
+                const idToRemove = video.id;
+                playNext(true); // 特別通知 playNext 當前影片已被移除
+                removeFromPlaylist(idToRemove);
+            } else {
+                playNext();
+            }
+        }
+
+        function playNext(wasDeleted = false) {
+            if (playlist.length === 0) {
+                currentIndex = -1;
+                updateUI();
+                return;
+            }
+
+            const currentVideo = playlist[currentIndex];
+            
+            if (currentVideo && currentVideo.random) {
+                // 如果開啟隨機模式，隨機抽選與目前不同首的歌
+                if (playlist.length > 1) {
+                    let nextIdx = currentIndex;
+                    while(nextIdx === currentIndex) {
+                        nextIdx = Math.floor(Math.random() * playlist.length);
+                    }
+                    currentIndex = nextIdx;
+                }
+            } else {
+                // 循序播放。如果當前曲目剛被刪除，直接載入原 index 即可
+                if (!wasDeleted) {
+                    currentIndex = (currentIndex + 1) % playlist.length;
+                } else {
+                    if (currentIndex >= playlist.length) currentIndex = 0;
+                }
+            }
+
+            loadVideo(currentIndex);
+        }
+
+        function loadVideo(index) {
+            if (index < 0 || index >= playlist.length) return;
+            currentIndex = index;
+            currentRepeatCount = 0;
+            const video = playlist[currentIndex];
+
+            player.loadVideoById(video.youtubeId);
+            
+            // 隱藏初始佔位符
+            document.getElementById('placeholder').style.display = 'none';
+            
+            // 更新目前播放卡片
+            document.getElementById('currentInfo').classList.remove('hidden');
+            document.getElementById('currentTitle').innerText = video.title;
+            document.getElementById('errorDisplay').classList.add('hidden');
+            
+            // 同步黑膠唱片封面圖 (使用 YouTube 高清預覽縮圖)
+            document.getElementById('vinylCover').src = `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`;
+
+            updateUI();
+        }
+
+        // --- 輔助函式 ---
+        function extractVideoID(url) {
+            const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
+        function addToPlaylist(ytId) {
+            const newItem = {
+                id: Date.now().toString(),
+                youtubeId: ytId,
+                title: `載入中: ${ytId}`,
+                repeats: 1, 
+                once: true,
+                random: false
+            };
+
+            playlist.push(newItem);
+            renderPlaylist();
+            updatePlaylistCount();
+
+            // 如果是第一部，自動播放
+            if (currentIndex === -1) {
+                loadVideo(0);
+            }
+
+            // 抓取影片 OEmbed 資訊以取得正確標題
+            fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytId}&format=json`)
+                .then(res => res.json())
+                .then(data => {
+                    newItem.title = data.title;
+                    renderPlaylist();
+                    if (currentIndex !== -1 && playlist[currentIndex].id === newItem.id) {
+                        document.getElementById('currentTitle').innerText = data.title;
+                    }
+                })
+                .catch(() => {
+                    newItem.title = `YouTube 影片 (${ytId})`;
+                    renderPlaylist();
+                });
+        }
+
+        function removeFromPlaylist(id) {
+            const idx = playlist.findIndex(v => v.id === id);
+            if (idx === -1) return;
+
+            const isCurrent = (idx === currentIndex);
+            playlist.splice(idx, 1);
+
+            if (isCurrent) {
+                if (playlist.length > 0) {
+                    playNext(true);
+                } else {
+                    player.stopVideo();
+                    currentIndex = -1;
+                    document.getElementById('currentInfo').classList.add('hidden');
+                    document.getElementById('placeholder').style.display = 'flex';
+                    // 關閉唱片與音波
+                    updateVisualizerAnimation(YT.PlayerState.PAUSED);
+                }
+            } else if (idx < currentIndex) {
+                currentIndex--;
+            }
+
+            renderPlaylist();
+            updatePlaylistCount();
+        }
+
+        function renderPlaylist() {
+            const container = document.getElementById('playlist');
+            container.innerHTML = '';
+            const template = document.getElementById('video-item-template');
+
+            playlist.forEach((video, index) => {
+                const clone = template.content.cloneNode(true);
+                const root = clone.querySelector('.video-item');
+                
+                // 標示當前播放中曲目
+                if (index === currentIndex) {
+                    root.classList.add('ring-2', 'ring-blue-500', 'bg-blue-900/20');
+                }
+
+                root.querySelector('.title').innerText = video.title;
+                root.querySelector('.title').onclick = () => loadVideo(index);
+                root.querySelector('.title').classList.add('cursor-pointer');
+
+                // 按鈕控制
+                const repBtn = root.querySelector('.repeat-btn');
+                const repNum = repBtn.querySelector('.count-num');
+                repNum.innerText = video.repeats;
+                if (video.repeats !== 1) repBtn.classList.add('text-blue-400');
+                repBtn.onclick = () => {
+                    if (video.repeats === 1) video.repeats = 2;
+                    else if (video.repeats === 2) video.repeats = 3;
+                    else if (video.repeats === 3) video.repeats = '∞';
+                    else video.repeats = 1;
+                    renderPlaylist();
+                };
+
+                const onceBtn = root.querySelector('.once-btn');
+                if (video.once) onceBtn.classList.add('text-blue-400');
+                else onceBtn.classList.add('text-slate-500');
+                onceBtn.onclick = () => {
+                    video.once = !video.once;
+                    renderPlaylist();
+                };
+
+                const randBtn = root.querySelector('.random-btn');
+                if (video.random) randBtn.classList.add('text-green-400');
+                else randBtn.classList.add('text-slate-500');
+                randBtn.onclick = () => {
+                    video.random = !video.random;
+                    renderPlaylist();
+                };
+
+                root.querySelector('.delete-btn').onclick = () => removeFromPlaylist(video.id);
+
+                container.appendChild(clone);
+            });
+        }
+
+        function updatePlaylistCount() {
+            document.getElementById('playlistCount').innerText = playlist.length;
+        }
+
+        function updateUI() {
+            renderPlaylist();
+        }
+
+        function showError(msg) {
+            const err = document.getElementById('errorDisplay');
+            const errMsg = document.getElementById('errorMsg');
+            err.classList.remove('hidden');
+            errMsg.innerText = msg;
+            setTimeout(() => err.classList.add('hidden'), 5000);
+        }
+
+        // --- 綁定事件監聽器 ---
+        document.getElementById('loadBtn').onclick = () => {
+            const input = document.getElementById('videoInput');
+            const id = extractVideoID(input.value.trim());
+            if (id) {
+                addToPlaylist(id);
+                input.value = '';
+            } else {
+                showError("網址格式錯誤，請重新貼上。");
+            }
+        };
+
+        document.getElementById('videoInput').onkeydown = (e) => {
+            if (e.key === 'Enter') document.getElementById('loadBtn').click();
+        };
+
+        document.getElementById('pasteBtn').onclick = async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                document.getElementById('videoInput').value = text;
+            } catch (err) {
+                showError("無法自動讀取剪貼簿，請使用 Ctrl+V 貼上。");
+            }
+        };
+
+        // --- 純享音樂模式切換邏輯 ---
+        const musicModeToggle = document.getElementById('musicModeToggle');
+        const musicModeOverlay = document.getElementById('musicModeOverlay');
+
+        musicModeToggle.onclick = () => {
+            isMusicMode = !isMusicMode;
+            if (isMusicMode) {
+                musicModeToggle.classList.remove('bg-slate-700', 'text-slate-300', 'border-slate-600');
+                musicModeToggle.classList.add('bg-sky-600', 'text-white', 'border-sky-500');
+                musicModeToggle.innerHTML = '<i class="fas fa-headphones-alt text-lg"></i> <span>純享音樂模式: 開</span>';
+                
+                musicModeOverlay.classList.remove('hidden');
+                musicModeOverlay.classList.add('flex');
+            } else {
+                musicModeToggle.classList.remove('bg-sky-600', 'text-white', 'border-sky-500');
+                musicModeToggle.classList.add('bg-slate-700', 'text-slate-300', 'border-slate-600');
+                musicModeToggle.innerHTML = '<i class="fas fa-headphones text-lg"></i> <span>純享音樂模式: 關</span>';
+                
+                musicModeOverlay.classList.add('hidden');
+                musicModeOverlay.classList.remove('flex');
+            }
+        };
+
+        // 初始化拖曳排序
+        new Sortable(document.getElementById('playlist'), {
+            animation: 150,
+            handle: '.handle',
+            ghostClass: 'ghost-card',
+            onEnd: function (evt) {
+                const item = playlist.splice(evt.oldIndex, 1)[0];
+                playlist.splice(evt.newIndex, 0, item);
+                
+                // 動態保持 currentIndex 同步
+                if (currentIndex === evt.oldIndex) {
+                    currentIndex = evt.newIndex;
+                } else if (evt.oldIndex < currentIndex && evt.newIndex >= currentIndex) {
+                    currentIndex--;
+                } else if (evt.oldIndex > currentIndex && evt.newIndex <= currentIndex) {
+                    currentIndex++;
+                }
+                renderPlaylist();
+            }
+        });
+    </script>
+</body>
+</html>
