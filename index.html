@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Player Ultra - 功能全還原版</title>
+    <title>YouTube Player Ultra - 究極完整版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -14,9 +14,22 @@
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        .ghost-card { opacity: 0.5; background: #334155 !important; }
+        
+        /* 唱片與音波動畫 */
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .vinyl-spin { animation: spin 15s linear infinite; }
         .vinyl-paused { animation-play-state: paused; }
+        
+        @keyframes bounce-wave { 0%, 100% { height: 8px; } 50% { height: 42px; } }
+        .wave-bar { width: 4px; background-color: #38bdf8; border-radius: 2px; animation: bounce-wave 1.2s ease-in-out infinite; }
+        .wave-bar:nth-child(2) { animation-delay: 0.15s; animation-duration: 1.4s; }
+        .wave-bar:nth-child(3) { animation-delay: 0.3s; animation-duration: 1.1s; }
+        .wave-bar:nth-child(4) { animation-delay: 0.45s; animation-duration: 1.3s; }
+        .wave-bar:nth-child(5) { animation-delay: 0.1s; animation-duration: 1.5s; }
+        .wave-bar:nth-child(6) { animation-delay: 0.25s; animation-duration: 1.2s; }
+        .wave-bar:nth-child(7) { animation-delay: 0.4s; animation-duration: 1.6s; }
+        .wave-paused { animation-play-state: paused !important; height: 8px !important; }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8">
@@ -27,34 +40,72 @@
                 <i class="fab fa-youtube text-red-500 text-4xl"></i> YouTube Player Ultra
             </h1>
             <div class="flex flex-col lg:flex-row gap-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700 shadow-xl">
-                <input type="text" id="videoInput" class="flex-grow bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 outline-none text-white" placeholder="請貼上影片網址...">
-                <button id="loadBtn" class="bg-red-600 hover:bg-red-700 px-6 rounded-lg font-bold">載入影片</button>
-                <button id="musicModeToggle" class="bg-slate-700 px-6 rounded-lg font-bold text-slate-300">🎧 純享模式: 關</button>
+                <input type="text" id="videoInput" class="flex-grow bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 outline-none text-white focus:ring-2 focus:ring-blue-500" placeholder="請貼上影片網址...">
+                <button id="loadBtn" class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-bold transition-all shadow-lg active:scale-95 text-white whitespace-nowrap">
+                    <i class="fas fa-plus"></i> 載入影片
+                </button>
+                <button id="musicModeToggle" class="bg-slate-700 hover:bg-slate-600 px-6 py-3 rounded-lg font-bold text-slate-300 transition-all border border-slate-600 whitespace-nowrap">
+                    🎧 純享模式: 關
+                </button>
             </div>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- 左側播放區域 -->
             <div class="lg:col-span-7 xl:col-span-8">
                 <div class="video-container shadow-2xl border border-slate-700">
                     <div id="player"></div>
-                    <div id="musicModeOverlay" class="music-mode-overlay flex-col items-center justify-center bg-slate-950/95 hidden z-10">
-                        <div id="vinylRecord" class="w-48 h-48 rounded-full bg-neutral-900 border-4 border-neutral-800 flex items-center justify-center vinyl-spin vinyl-paused">
-                            <img id="vinylCover" src="" class="w-16 h-16 rounded-full object-cover">
+                    
+                    <!-- 純享音樂模式遮罩 -->
+                    <div id="musicModeOverlay" class="music-mode-overlay flex-col items-center justify-center bg-slate-950/95 hidden z-10 select-none">
+                        <!-- 黑膠唱片 -->
+                        <div id="vinylRecord" class="w-48 h-48 md:w-56 md:h-56 rounded-full bg-neutral-900 border-4 border-neutral-800 shadow-2xl flex items-center justify-center vinyl-spin vinyl-paused">
+                            <div class="absolute inset-4 rounded-full border border-neutral-700 opacity-40"></div>
+                            <div class="absolute inset-8 rounded-full border border-neutral-700 opacity-30"></div>
+                            <img id="vinylCover" src="" class="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover border-2 border-slate-800 bg-slate-800 z-10" alt="Cover">
                         </div>
+                        
+                        <!-- 動態音波 -->
+                        <div class="flex items-end justify-center gap-1.5 h-12 mt-8">
+                            <div class="wave-bar wave-paused"></div><div class="wave-bar wave-paused"></div>
+                            <div class="wave-bar wave-paused"></div><div class="wave-bar wave-paused"></div>
+                            <div class="wave-bar wave-paused"></div><div class="wave-bar wave-paused"></div>
+                            <div class="wave-bar wave-paused"></div>
+                        </div>
+
+                        <!-- 影片名稱 -->
+                        <h2 id="musicModeTitle" class="text-white text-xl md:text-2xl font-bold mt-6 text-center px-6 max-w-full truncate text-sky-400 drop-shadow-md">
+                            等待播放...
+                        </h2>
                     </div>
                 </div>
             </div>
 
+            <!-- 右側清單與統計區域 -->
             <div class="lg:col-span-5 xl:col-span-4">
-                <div class="bg-slate-800 rounded-2xl border border-slate-700 flex flex-col h-[700px]">
-                    <div class="p-4 border-b border-slate-700 bg-slate-900/50 text-xs">
-                        <div id="playbackTimer" class="font-mono text-sky-400 mb-2 font-bold">目前無播放</div>
-                        <div class="grid grid-cols-2 gap-2 text-[10px]">
-                            <div class="bg-slate-700 p-2 rounded">佇列(灰+藍): <span id="queueTime" class="text-blue-400 font-bold">0:00</span></div>
-                            <div class="bg-slate-700 p-2 rounded">全部統計: <span id="totalTime" class="text-red-400 font-bold">0:00</span></div>
+                <div class="bg-slate-800 rounded-2xl border border-slate-700 flex flex-col h-[700px] shadow-xl overflow-hidden">
+                    <!-- 統計面板 -->
+                    <div class="p-4 border-b border-slate-700 bg-slate-900/80">
+                        <div id="playbackTimer" class="font-mono text-sky-400 mb-3 font-bold truncate">目前無播放</div>
+                        <div class="grid grid-cols-2 gap-3 text-[11px] font-medium tracking-wide">
+                            <div class="bg-slate-700/50 p-2 rounded flex justify-between items-center">
+                                <span>佇列(灰+藍)</span> <span id="queueTime" class="text-blue-400 font-bold text-sm">0:00</span>
+                            </div>
+                            <div class="bg-slate-700/50 p-2 rounded flex justify-between items-center">
+                                <span>全部統計</span> <span id="totalTime" class="text-red-400 font-bold text-sm">0:00</span>
+                            </div>
                         </div>
                     </div>
+                    
+                    <!-- 播放清單 -->
                     <div id="playlist" class="flex-grow overflow-y-auto p-4 space-y-3 custom-scrollbar"></div>
+
+                    <!-- 三態圖例 -->
+                    <div class="p-3 bg-slate-950/50 border-t border-slate-800 text-[11px] text-slate-400 flex justify-center gap-4">
+                        <span><i class="fas fa-ghost text-blue-400"></i> 一次性</span>
+                        <span><i class="fas fa-ghost text-slate-400"></i> 常態</span>
+                        <span><i class="fas fa-ghost text-red-400"></i> 低調避讓</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -66,12 +117,14 @@
         let currentIndex = -1;
         let isMusicMode = false;
 
+        // 格式化秒數
         function formatTime(s) {
             const m = Math.floor(s / 60);
             const sec = Math.floor(s % 60);
             return `${m}:${sec.toString().padStart(2, '0')}`;
         }
 
+        // 初始化 YouTube API
         const tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         document.body.appendChild(tag);
@@ -79,24 +132,50 @@
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('player', { 
                 height: '100%', width: '100%', 
-                events: { 'onStateChange': e => {
-                    document.getElementById('vinylRecord').classList.toggle('vinyl-paused', e.data !== 1);
-                    if (e.data === 0) playNext();
-                }}
+                playerVars: { 'autoplay': 0, 'rel': 0 },
+                events: { 'onStateChange': onStateChange } 
             });
         }
 
+        // 監聽播放狀態 (控制動畫與下一首)
+        function onStateChange(e) {
+            const vinyl = document.getElementById('vinylRecord');
+            const waves = document.querySelectorAll('.wave-bar');
+            
+            if (e.data === 1) { // 播放中
+                vinyl.classList.remove('vinyl-paused');
+                waves.forEach(w => w.classList.remove('wave-paused'));
+                
+                // 動態更新真實時長
+                if (currentIndex !== -1 && player.getDuration() > 0) {
+                    playlist[currentIndex].duration = player.getDuration();
+                    updateStats();
+                }
+            } else { // 暫停或緩衝
+                vinyl.classList.add('vinyl-paused');
+                waves.forEach(w => w.classList.add('wave-paused'));
+            }
+            
+            if (e.data === 0) { // 播完
+                handleVideoEnd();
+            }
+        }
+
+        // 計時器：每秒更新 UI 與進度
         setInterval(() => {
             if (player && player.getCurrentTime && currentIndex !== -1) {
                 const current = player.getCurrentTime();
                 const duration = player.getDuration();
                 if (duration > 0) {
-                    document.getElementById('playbackTimer').innerText = `${currentIndex + 1}. | ${formatTime(current)}/${formatTime(duration)}`;
+                    const titleShort = playlist[currentIndex].title.length > 15 
+                        ? playlist[currentIndex].title.substring(0, 15) + '...' 
+                        : playlist[currentIndex].title;
+                    document.getElementById('playbackTimer').innerText = `${currentIndex + 1}. ${titleShort} | ${formatTime(current)} / ${formatTime(duration)}`;
                 }
             }
-            updateStats();
         }, 1000);
 
+        // 更新時長統計
         function updateStats() {
             let queue = 0, total = 0;
             playlist.forEach(v => {
@@ -107,50 +186,180 @@
             document.getElementById('totalTime').innerText = formatTime(total);
         }
 
-        function playNext() {
-            if(playlist.length === 0) return;
-            currentIndex = (currentIndex + 1) % playlist.length;
-            player.loadVideoById(playlist[currentIndex].youtubeId);
+        // 檢查是否有藍色幽靈
+        function hasBlueGhosts() {
+            return playlist.some(v => v.ghostState === 'once');
+        }
+
+        // 處理影片結束邏輯
+        function handleVideoEnd() {
+            if (currentIndex === -1) return;
+            const video = playlist[currentIndex];
+            
+            if (video.ghostState === 'once') {
+                const idToRemove = video.id;
+                playNext(true); // 通知 playNext 這是因為刪除而換歌
+                playlist = playlist.filter(x => x.id !== idToRemove);
+                renderPlaylist();
+                updateStats();
+            } else {
+                playNext();
+            }
+        }
+
+        // 決定下一首播什麼
+        function playNext(wasDeleted = false) {
+            if (playlist.length === 0) {
+                currentIndex = -1;
+                document.getElementById('playbackTimer').innerText = "目前無播放";
+                document.getElementById('musicModeTitle').innerText = "等待播放...";
+                return;
+            }
+
+            const hasBlue = hasBlueGhosts();
+            const currentVideo = playlist[currentIndex];
+
+            // 取得可播放的清單 (有藍色時，排除紅色)
+            const playableIndices = [];
+            playlist.forEach((v, idx) => {
+                if (hasBlue && v.ghostState === 'stealth') return;
+                playableIndices.push(idx);
+            });
+
+            if (playableIndices.length === 0) {
+                currentIndex = 0; // 極端情況防呆
+            } else if (currentVideo && currentVideo.random) {
+                // 隨機播放
+                if (playableIndices.length > 1) {
+                    let nextIdx = currentIndex;
+                    let attempts = 0;
+                    while ((nextIdx === currentIndex || !playableIndices.includes(nextIdx)) && attempts < 20) {
+                        nextIdx = playableIndices[Math.floor(Math.random() * playableIndices.length)];
+                        attempts++;
+                    }
+                    currentIndex = nextIdx;
+                } else {
+                    currentIndex = playableIndices[0];
+                }
+            } else {
+                // 順序播放
+                let startSearchIdx = currentIndex;
+                if (!wasDeleted) startSearchIdx = (startSearchIdx + 1) % playlist.length;
+                else if (startSearchIdx >= playlist.length) startSearchIdx = 0;
+
+                let found = false;
+                for (let i = 0; i < playlist.length; i++) {
+                    let checkIdx = (startSearchIdx + i) % playlist.length;
+                    if (playableIndices.includes(checkIdx)) {
+                        currentIndex = checkIdx;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) currentIndex = playableIndices[0];
+            }
+
+            loadVideo(currentIndex);
+        }
+
+        // 載入指定影片
+        function loadVideo(index) {
+            if (index < 0 || index >= playlist.length) return;
+            currentIndex = index;
+            const video = playlist[currentIndex];
+
+            player.loadVideoById(video.youtubeId);
+            
+            // 更新純享模式視覺 (封面與標題)
+            document.getElementById('vinylCover').src = `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`;
+            document.getElementById('musicModeTitle').innerText = video.title;
+
             renderPlaylist();
         }
 
+        // 新增影片至清單
         function addToPlaylist(ytId) {
-            playlist.push({
+            const newItem = {
                 id: Date.now().toString(),
                 youtubeId: ytId,
-                title: "影片載入中...",
-                ghostState: 'once',
+                title: "讀取標題中...",
+                ghostState: 'keep', // 預設常態灰色
                 random: false,
-                duration: 240
-            });
+                duration: 0 // 真實時長等播放時取得
+            };
+            
+            playlist.push(newItem);
             renderPlaylist();
-            if(currentIndex === -1) playNext();
+            
+            if (currentIndex === -1) loadVideo(0);
+
+            // 使用 YouTube OEmbed API 獲取影片真實標題
+            fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytId}&format=json`)
+                .then(res => res.json())
+                .then(data => {
+                    newItem.title = data.title;
+                    renderPlaylist();
+                    if (currentIndex !== -1 && playlist[currentIndex].id === newItem.id) {
+                        document.getElementById('musicModeTitle').innerText = data.title;
+                    }
+                })
+                .catch(() => {
+                    newItem.title = `影片 (${ytId})`;
+                    renderPlaylist();
+                });
         }
 
+        // 渲染右側播放清單
         function renderPlaylist() {
             const list = document.getElementById('playlist');
-            list.innerHTML = playlist.map((v, i) => `
-                <div class="p-3 bg-slate-900 rounded border border-slate-700 flex justify-between items-center ${i === currentIndex ? 'ring-2 ring-blue-500' : ''}">
-                    <span class="text-xs truncate w-24">${v.title}</span>
-                    <div class="flex gap-1">
-                        <button onclick="toggleGhost('${v.id}')" class="text-sm p-2 rounded ${v.ghostState === 'once' ? 'text-blue-400' : v.ghostState === 'stealth' ? 'text-red-400' : 'text-slate-400'}">
+            const hasBlue = hasBlueGhosts();
+
+            list.innerHTML = playlist.map((v, i) => {
+                const isActive = i === currentIndex;
+                const isSkipped = hasBlue && v.ghostState === 'stealth';
+                
+                // 按鈕顏色設定
+                let ghostColor = 'text-slate-400 bg-slate-700/50 hover:bg-slate-600';
+                if (v.ghostState === 'once') ghostColor = 'text-blue-400 bg-blue-900/40 hover:bg-blue-800/60';
+                if (v.ghostState === 'stealth') ghostColor = 'text-red-400 bg-red-900/30 hover:bg-red-800/50';
+
+                return `
+                <div class="group flex items-center gap-3 p-3 bg-slate-900 border border-slate-700 rounded-xl transition-all hover:border-slate-500 
+                            ${isActive ? 'ring-2 ring-blue-500 bg-blue-900/20' : ''} 
+                            ${isSkipped && !isActive ? 'opacity-40 grayscale-[50%]' : ''}">
+                    
+                    <!-- 把手 (可拖曳) -->
+                    <div class="handle cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-300 px-1">
+                        <i class="fas fa-grip-vertical"></i>
+                    </div>
+
+                    <!-- 影片標題 -->
+                    <div class="flex-grow min-w-0 cursor-pointer" onclick="loadVideo(${i})">
+                        <h4 class="text-sm font-medium truncate text-slate-200" title="${v.title}">${v.title}</h4>
+                    </div>
+
+                    <!-- 控制按鈕區 -->
+                    <div class="flex gap-1.5 items-center">
+                        <button onclick="toggleGhost('${v.id}')" class="w-8 h-8 flex justify-center items-center rounded transition-colors ${ghostColor}" title="切換幽靈模式">
                             <i class="fas fa-ghost"></i>
                         </button>
-                        <button onclick="toggleRandom('${v.id}')" class="text-sm p-2 rounded ${v.random ? 'text-green-400' : 'text-slate-600'}">
+                        <button onclick="toggleRandom('${v.id}')" class="w-8 h-8 flex justify-center items-center rounded bg-slate-700/50 hover:bg-slate-600 transition-colors ${v.random ? 'text-green-400' : 'text-slate-500'}" title="開啟隨機下一首">
                             <i class="fas fa-random"></i>
                         </button>
-                        <button onclick="removeVideo('${v.id}')" class="text-sm p-2 text-slate-500 hover:text-red-400">
-                            <i class="fas fa-trash"></i>
+                        <button onclick="removeVideo('${v.id}')" class="w-8 h-8 flex justify-center items-center rounded text-slate-500 hover:text-red-400 hover:bg-red-900/20 transition-colors" title="刪除影片">
+                            <i class="fas fa-trash-alt"></i>
                         </button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
+        // 按鈕功能邏輯
         function toggleGhost(id) {
             const v = playlist.find(x => x.id === id);
             v.ghostState = v.ghostState === 'once' ? 'keep' : v.ghostState === 'keep' ? 'stealth' : 'once';
             renderPlaylist();
+            updateStats(); // 狀態改變會影響佇列總長
         }
 
         function toggleRandom(id) {
@@ -160,19 +369,81 @@
         }
 
         function removeVideo(id) {
+            const isCurrent = playlist[currentIndex]?.id === id;
             playlist = playlist.filter(x => x.id !== id);
+            
+            if (isCurrent) {
+                if (playlist.length > 0) playNext(true);
+                else {
+                    player.stopVideo();
+                    currentIndex = -1;
+                    document.getElementById('vinylCover').src = '';
+                }
+            } else {
+                // 修正 currentIndex 偏移
+                const oldIdx = playlist.findIndex(x => x.id === playlist[currentIndex]?.id);
+                if (oldIdx !== -1) currentIndex = oldIdx;
+            }
             renderPlaylist();
+            updateStats();
         }
 
+        // 初始化拖曳排序 (SortableJS)
+        new Sortable(document.getElementById('playlist'), {
+            animation: 150,
+            handle: '.handle',
+            ghostClass: 'ghost-card',
+            onEnd: function (evt) {
+                const item = playlist.splice(evt.oldIndex, 1)[0];
+                playlist.splice(evt.newIndex, 0, item);
+                
+                // 動態修正目前播放的 Index 以對應新位置
+                if (currentIndex === evt.oldIndex) currentIndex = evt.newIndex;
+                else if (evt.oldIndex < currentIndex && evt.newIndex >= currentIndex) currentIndex--;
+                else if (evt.oldIndex > currentIndex && evt.newIndex <= currentIndex) currentIndex++;
+                
+                renderPlaylist();
+            }
+        });
+
+        // 綁定載入按鈕
         document.getElementById('loadBtn').onclick = () => {
-            const id = document.getElementById('videoInput').value.split('v=')[1]?.substring(0,11);
-            if(id) addToPlaylist(id);
+            const input = document.getElementById('videoInput');
+            // 強化正則表達式，適配更多網址格式
+            const match = input.value.match(/[?&]v=([^&]+)/) || input.value.match(/youtu\.be\/([^?]+)/);
+            const id = match ? match[1] : null;
+            if(id) {
+                addToPlaylist(id);
+                input.value = ''; // 清空輸入框
+            } else {
+                alert("無效的 YouTube 網址！");
+            }
         };
 
+        // 綁定 Enter 鍵載入
+        document.getElementById('videoInput').onkeydown = (e) => {
+            if (e.key === 'Enter') document.getElementById('loadBtn').click();
+        };
+
+        // 綁定純享模式切換
         document.getElementById('musicModeToggle').onclick = () => {
             isMusicMode = !isMusicMode;
-            document.getElementById('musicModeOverlay').classList.toggle('hidden', !isMusicMode);
-            document.getElementById('musicModeOverlay').classList.toggle('flex', isMusicMode);
+            const btn = document.getElementById('musicModeToggle');
+            const overlay = document.getElementById('musicModeOverlay');
+            
+            if (isMusicMode) {
+                btn.classList.add('bg-sky-600', 'text-white', 'border-sky-500');
+                btn.classList.remove('bg-slate-700', 'text-slate-300');
+                btn.innerHTML = '🎧 純享模式: 開';
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+            } else {
+                btn.classList.remove('bg-sky-600', 'text-white', 'border-sky-500');
+                btn.classList.add('bg-slate-700', 'text-slate-300');
+                btn.innerHTML = '🎧 純享模式: 關';
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+            }
         };
     </script>
 </body>
