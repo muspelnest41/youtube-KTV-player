@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Player Ultra - 完整功能版</title>
+    <title>YouTube Player Ultra - 功能全還原版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -14,13 +14,9 @@
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
-        .ghost-card { opacity: 0.5; background: #334155 !important; }
-        .vinyl-spin { animation: spin 15s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .vinyl-spin { animation: spin 15s linear infinite; }
         .vinyl-paused { animation-play-state: paused; }
-        @keyframes bounce-wave { 0%, 100% { height: 8px; } 50% { height: 42px; } }
-        .wave-bar { width: 4px; background-color: #38bdf8; border-radius: 2px; animation: bounce-wave 1.2s ease-in-out infinite; }
-        .wave-paused { animation-play-state: paused !important; height: 8px !important; }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8">
@@ -45,20 +41,17 @@
                         <div id="vinylRecord" class="w-48 h-48 rounded-full bg-neutral-900 border-4 border-neutral-800 flex items-center justify-center vinyl-spin vinyl-paused">
                             <img id="vinylCover" src="" class="w-16 h-16 rounded-full object-cover">
                         </div>
-                        <div class="flex items-end justify-center gap-1.5 h-12 mt-6">
-                            <div class="wave-bar wave-paused"></div><div class="wave-bar wave-paused"></div><div class="wave-bar wave-paused"></div>
-                        </div>
                     </div>
                 </div>
             </div>
 
             <div class="lg:col-span-5 xl:col-span-4">
                 <div class="bg-slate-800 rounded-2xl border border-slate-700 flex flex-col h-[700px]">
-                    <div class="p-4 border-b border-slate-700 bg-slate-900/50">
-                        <div id="playbackTimer" class="text-sm font-mono text-sky-400 mb-2">請開始播放...</div>
-                        <div class="grid grid-cols-2 gap-2 text-xs">
-                            <div class="bg-slate-700 p-2 rounded">佇列(灰+藍): <span id="queueTime" class="font-bold">0:00</span></div>
-                            <div class="bg-slate-700 p-2 rounded">全部統計: <span id="totalTime" class="font-bold">0:00</span></div>
+                    <div class="p-4 border-b border-slate-700 bg-slate-900/50 text-xs">
+                        <div id="playbackTimer" class="font-mono text-sky-400 mb-2 font-bold">目前無播放</div>
+                        <div class="grid grid-cols-2 gap-2 text-[10px]">
+                            <div class="bg-slate-700 p-2 rounded">佇列(灰+藍): <span id="queueTime" class="text-blue-400 font-bold">0:00</span></div>
+                            <div class="bg-slate-700 p-2 rounded">全部統計: <span id="totalTime" class="text-red-400 font-bold">0:00</span></div>
                         </div>
                     </div>
                     <div id="playlist" class="flex-grow overflow-y-auto p-4 space-y-3 custom-scrollbar"></div>
@@ -84,20 +77,13 @@
         document.body.appendChild(tag);
 
         function onYouTubeIframeAPIReady() {
-            player = new YT.Player('player', { height: '100%', width: '100%', events: { 'onStateChange': onStateChange } });
-        }
-
-        function onStateChange(e) {
-            const vinyl = document.getElementById('vinylRecord');
-            const waves = document.querySelectorAll('.wave-bar');
-            if (e.data === 1) { // PLAYING
-                vinyl.classList.remove('vinyl-paused');
-                waves.forEach(w => w.classList.remove('wave-paused'));
-            } else {
-                vinyl.classList.add('vinyl-paused');
-                waves.forEach(w => w.classList.add('wave-paused'));
-            }
-            if (e.data === 0) playNext();
+            player = new YT.Player('player', { 
+                height: '100%', width: '100%', 
+                events: { 'onStateChange': e => {
+                    document.getElementById('vinylRecord').classList.toggle('vinyl-paused', e.data !== 1);
+                    if (e.data === 0) playNext();
+                }}
+            });
         }
 
         setInterval(() => {
@@ -105,9 +91,7 @@
                 const current = player.getCurrentTime();
                 const duration = player.getDuration();
                 if (duration > 0) {
-                    const remaining = duration - current;
-                    document.getElementById('playbackTimer').innerText = 
-                        `${currentIndex + 1}: ${playlist[currentIndex].title.substring(0,10)}... | ${formatTime(current)}/${formatTime(duration)}/${formatTime(remaining)}`;
+                    document.getElementById('playbackTimer').innerText = `${currentIndex + 1}. | ${formatTime(current)}/${formatTime(duration)}`;
                 }
             }
             updateStats();
@@ -116,9 +100,8 @@
         function updateStats() {
             let queue = 0, total = 0;
             playlist.forEach(v => {
-                const s = v.duration || 0;
-                total += s;
-                if (v.ghostState !== 'stealth') queue += s;
+                total += v.duration;
+                if (v.ghostState !== 'stealth') queue += v.duration;
             });
             document.getElementById('queueTime').innerText = formatTime(queue);
             document.getElementById('totalTime').innerText = formatTime(total);
@@ -126,45 +109,63 @@
 
         function playNext() {
             if(playlist.length === 0) return;
-            // 簡化邏輯：依序跳轉
             currentIndex = (currentIndex + 1) % playlist.length;
             player.loadVideoById(playlist[currentIndex].youtubeId);
             renderPlaylist();
         }
 
         function addToPlaylist(ytId) {
-            const newItem = {
+            playlist.push({
                 id: Date.now().toString(),
                 youtubeId: ytId,
-                title: "影片標題...",
+                title: "影片載入中...",
                 ghostState: 'once',
-                duration: Math.floor(Math.random() * 300) + 60
-            };
-            playlist.push(newItem);
+                random: false,
+                duration: 240
+            });
             renderPlaylist();
+            if(currentIndex === -1) playNext();
         }
 
         function renderPlaylist() {
             const list = document.getElementById('playlist');
             list.innerHTML = playlist.map((v, i) => `
                 <div class="p-3 bg-slate-900 rounded border border-slate-700 flex justify-between items-center ${i === currentIndex ? 'ring-2 ring-blue-500' : ''}">
-                    <span>${v.title} (${formatTime(v.duration)})</span>
-                    <button onclick="toggleGhost('${v.id}')" class="text-xs px-2 py-1 rounded ${v.ghostState === 'once' ? 'bg-blue-600' : v.ghostState === 'stealth' ? 'bg-red-600' : 'bg-slate-600'}">${v.ghostState}</button>
+                    <span class="text-xs truncate w-24">${v.title}</span>
+                    <div class="flex gap-1">
+                        <button onclick="toggleGhost('${v.id}')" class="text-sm p-2 rounded ${v.ghostState === 'once' ? 'text-blue-400' : v.ghostState === 'stealth' ? 'text-red-400' : 'text-slate-400'}">
+                            <i class="fas fa-ghost"></i>
+                        </button>
+                        <button onclick="toggleRandom('${v.id}')" class="text-sm p-2 rounded ${v.random ? 'text-green-400' : 'text-slate-600'}">
+                            <i class="fas fa-random"></i>
+                        </button>
+                        <button onclick="removeVideo('${v.id}')" class="text-sm p-2 text-slate-500 hover:text-red-400">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             `).join('');
         }
 
         function toggleGhost(id) {
             const v = playlist.find(x => x.id === id);
-            if(v.ghostState === 'once') v.ghostState = 'keep';
-            else if(v.ghostState === 'keep') v.ghostState = 'stealth';
-            else v.ghostState = 'once';
+            v.ghostState = v.ghostState === 'once' ? 'keep' : v.ghostState === 'keep' ? 'stealth' : 'once';
+            renderPlaylist();
+        }
+
+        function toggleRandom(id) {
+            const v = playlist.find(x => x.id === id);
+            v.random = !v.random;
+            renderPlaylist();
+        }
+
+        function removeVideo(id) {
+            playlist = playlist.filter(x => x.id !== id);
             renderPlaylist();
         }
 
         document.getElementById('loadBtn').onclick = () => {
-            const url = document.getElementById('videoInput').value;
-            const id = url.split('v=')[1]?.substring(0,11);
+            const id = document.getElementById('videoInput').value.split('v=')[1]?.substring(0,11);
             if(id) addToPlaylist(id);
         };
 
