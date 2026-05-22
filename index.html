@@ -39,14 +39,46 @@
             <h1 class="text-3xl font-bold mb-6 flex items-center gap-3 text-white">
                 <i class="fab fa-youtube text-red-500 text-4xl"></i> YouTube Player Ultra
             </h1>
-            <div class="flex flex-col lg:flex-row gap-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700 shadow-xl">
-                <input type="text" id="videoInput" class="flex-grow bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 outline-none text-white focus:ring-2 focus:ring-blue-500" placeholder="請貼上影片網址...">
-                <button id="loadBtn" class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-bold transition-all shadow-lg active:scale-95 text-white whitespace-nowrap">
-                    <i class="fas fa-plus"></i> 載入影片
-                </button>
-                <button id="musicModeToggle" class="bg-slate-700 hover:bg-slate-600 px-6 py-3 rounded-lg font-bold text-slate-300 transition-all border border-slate-600 whitespace-nowrap">
-                    🎧 純享模式: 關
-                </button>
+            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700 shadow-xl flex flex-col gap-4">
+                <!-- 網址輸入列與控制按鈕 -->
+                <div class="flex flex-col lg:flex-row gap-4">
+                    <div class="relative flex-grow">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                            <i class="fab fa-youtube"></i>
+                        </span>
+                        <input type="text" id="videoInput" class="block w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 outline-none text-white focus:ring-2 focus:ring-blue-500" placeholder="請貼上影片網址...">
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <!-- 原載入按鈕 -->
+                        <button id="loadBtn" class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-bold transition-all shadow-lg active:scale-95 text-white whitespace-nowrap flex items-center gap-2">
+                            <i class="fas fa-plus"></i> 載入影片
+                        </button>
+                        <!-- 2-A: 新增貼上並載入影片按鈕 -->
+                        <button id="pasteLoadBtn" class="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-bold transition-all shadow-lg active:scale-95 text-white whitespace-nowrap flex items-center gap-2" title="讀取系統剪貼簿中的 YouTube 網址並直接載入">
+                            <i class="fas fa-clipboard-list"></i> 貼上並載入
+                        </button>
+                        <button id="musicModeToggle" class="bg-slate-700 hover:bg-slate-600 px-6 py-3 rounded-lg font-bold text-slate-300 transition-all border border-slate-600 whitespace-nowrap">
+                            🎧 純享模式: 關
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2-B, 2-C: 新加入影片之預設狀態設定列 -->
+                <div class="flex flex-wrap gap-4 items-center text-xs text-slate-400 border-t border-slate-700/50 pt-3">
+                    <span class="font-bold text-slate-300"><i class="fas fa-cog mr-1"></i> 新載入影片預設設定：</span>
+                    
+                    <!-- 預設幽靈按鈕 -->
+                    <button id="defaultGhostBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-500/30 bg-blue-900/20 text-blue-400 hover:bg-blue-800/40 transition-all font-semibold" title="點擊切換新影片載入時的預設幽靈模式">
+                        <i class="fas fa-ghost"></i>
+                        <span>預設幽靈：一次性</span>
+                    </button>
+                    
+                    <!-- 預設隨機按鈕 -->
+                    <button id="defaultRandomBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-500 hover:text-slate-300 transition-all font-semibold" title="點擊切換新影片載入時是否預設開啟隨機">
+                        <i class="fas fa-random"></i>
+                        <span>預設隨機：關</span>
+                    </button>
+                </div>
             </div>
         </header>
 
@@ -73,7 +105,7 @@
                             <div class="wave-bar wave-paused"></div>
                         </div>
 
-                        <!-- 影片名稱 -->
+                        <!-- 影片名稱 (3: 加上影片名稱) -->
                         <h2 id="musicModeTitle" class="text-white text-xl md:text-2xl font-bold mt-6 text-center px-6 max-w-full truncate text-sky-400 drop-shadow-md">
                             等待播放...
                         </h2>
@@ -86,13 +118,22 @@
                 <div class="bg-slate-800 rounded-2xl border border-slate-700 flex flex-col h-[700px] shadow-xl overflow-hidden">
                     <!-- 統計面板 -->
                     <div class="p-4 border-b border-slate-700 bg-slate-900/80">
-                        <div id="playbackTimer" class="font-mono text-sky-400 mb-3 font-bold truncate">目前無播放</div>
+                        <div class="flex justify-between items-center mb-3">
+                            <!-- 1-1, 3: 顯示當下播放歌曲名稱與時長詳細資訊 -->
+                            <div id="playbackTimer" class="font-mono text-sky-400 font-bold truncate flex-grow">目前無播放</div>
+                            
+                            <!-- 1: 時長更新按鈕 -->
+                            <button id="syncDurationsBtn" class="ml-2 bg-slate-700 hover:bg-slate-600 text-xs px-2.5 py-1.5 rounded-lg text-slate-200 font-bold transition-all flex items-center gap-1 shrink-0 border border-slate-600 active:scale-95" title="自動在背景快速掃描所有歌曲真實長度並更新">
+                                <i id="syncIcon" class="fas fa-sync-alt"></i> <span>同步時長</span>
+                            </button>
+                        </div>
+                        
                         <div class="grid grid-cols-2 gap-3 text-[11px] font-medium tracking-wide">
-                            <div class="bg-slate-700/50 p-2 rounded flex justify-between items-center">
-                                <span>佇列(灰+藍)</span> <span id="queueTime" class="text-blue-400 font-bold text-sm">0:00</span>
+                            <div class="bg-slate-700/50 p-2 rounded flex justify-between items-center border border-slate-700">
+                                <span class="text-slate-400">佇列(灰+藍)</span> <span id="queueTime" class="text-blue-400 font-bold text-sm">0:00</span>
                             </div>
-                            <div class="bg-slate-700/50 p-2 rounded flex justify-between items-center">
-                                <span>全部統計</span> <span id="totalTime" class="text-red-400 font-bold text-sm">0:00</span>
+                            <div class="bg-slate-700/50 p-2 rounded flex justify-between items-center border border-slate-700">
+                                <span class="text-slate-400">全部統計</span> <span id="totalTime" class="text-red-400 font-bold text-sm">0:00</span>
                             </div>
                         </div>
                     </div>
@@ -117,8 +158,14 @@
         let currentIndex = -1;
         let isMusicMode = false;
 
+        // 預設設定狀態
+        let defaultGhostState = 'once'; // 'once', 'keep', 'stealth'
+        let defaultRandom = false;
+        let isSyncingDurations = false;
+
         // 格式化秒數
         function formatTime(s) {
+            if (isNaN(s) || s <= 0) return "0:00";
             const m = Math.floor(s / 60);
             const sec = Math.floor(s % 60);
             return `${m}:${sec.toString().padStart(2, '0')}`;
@@ -163,27 +210,110 @@
 
         // 計時器：每秒更新 UI 與進度
         setInterval(() => {
+            if (isSyncingDurations) return; // 同步期間暫停常態更新
+
             if (player && player.getCurrentTime && currentIndex !== -1) {
                 const current = player.getCurrentTime();
                 const duration = player.getDuration();
                 if (duration > 0) {
+                    const remaining = duration - current;
                     const titleShort = playlist[currentIndex].title.length > 15 
                         ? playlist[currentIndex].title.substring(0, 15) + '...' 
                         : playlist[currentIndex].title;
-                    document.getElementById('playbackTimer').innerText = `${currentIndex + 1}. ${titleShort} | ${formatTime(current)} / ${formatTime(duration)}`;
+                    
+                    // 1-1: 呈現 (單曲已播放時長)/(單曲總長)/剩餘時長
+                    document.getElementById('playbackTimer').innerText = 
+                        `${currentIndex + 1}. ${titleShort} | ${formatTime(current)} / ${formatTime(duration)} / -${formatTime(remaining)}`;
                 }
             }
         }, 1000);
 
-        // 更新時長統計
+        // 1-2, 1-3: 更新時長統計
         function updateStats() {
             let queue = 0, total = 0;
             playlist.forEach(v => {
                 total += v.duration;
-                if (v.ghostState !== 'stealth') queue += v.duration;
+                if (v.ghostState !== 'stealth') queue += v.duration; // 1-2: 僅統計一般+一次性 (非 stealth 歌曲)
             });
             document.getElementById('queueTime').innerText = formatTime(queue);
             document.getElementById('totalTime').innerText = formatTime(total);
+        }
+
+        // 1: 自動同步時長核心功能 (背景靜音快速載入輪詢技術)
+        async function syncDurations() {
+            if (playlist.length === 0) return;
+            if (isSyncingDurations) return;
+            
+            isSyncingDurations = true;
+            const syncIcon = document.getElementById('syncIcon');
+            syncIcon.classList.add('animate-spin');
+            
+            // 儲存當前播放狀態以便同步完畢後還原
+            const originalIndex = currentIndex;
+            let originalTime = 0;
+            let wasPlaying = false;
+            if (player && player.getCurrentTime) {
+                originalTime = player.getCurrentTime();
+                wasPlaying = (player.getPlayerState() === 1); // PLAYING
+            }
+            const originalMute = player.isMuted ? player.isMuted() : false;
+            
+            if (player && player.mute) player.mute(); // 靜音載入
+            
+            async function syncVideo(index) {
+                if (index >= playlist.length) {
+                    // 同步完畢，還原原影片與播放秒數
+                    isSyncingDurations = false;
+                    syncIcon.classList.remove('animate-spin');
+                    
+                    if (originalIndex !== -1) {
+                        currentIndex = originalIndex;
+                        const originalVideo = playlist[currentIndex];
+                        player.loadVideoById(originalVideo.youtubeId, originalTime);
+                        
+                        const checkRestore = setInterval(() => {
+                            if (player.getPlayerState && player.getPlayerState() !== -1) {
+                                if (!wasPlaying) {
+                                    player.pauseVideo();
+                                }
+                                if (!originalMute && player.unMute) {
+                                    player.unMute();
+                                }
+                                clearInterval(checkRestore);
+                            }
+                        }, 200);
+                    } else {
+                        player.stopVideo();
+                        document.getElementById('playbackTimer').innerText = "目前無播放";
+                    }
+                    
+                    renderPlaylist();
+                    updateStats();
+                    return;
+                }
+                
+                document.getElementById('playbackTimer').innerText = `正在更新時長 (${index + 1}/${playlist.length})...`;
+                player.loadVideoById(playlist[index].youtubeId);
+                
+                // 輪詢載入資訊，最長等待 2 秒
+                let attempts = 0;
+                const maxAttempts = 20; 
+                const poll = setInterval(() => {
+                    attempts++;
+                    if (player.getDuration && player.getDuration() > 0) {
+                        playlist[index].duration = player.getDuration();
+                        clearInterval(poll);
+                        syncVideo(index + 1);
+                    } else if (attempts >= maxAttempts) {
+                        // 超時預設給予 4 分鐘
+                        playlist[index].duration = playlist[index].duration || 240; 
+                        clearInterval(poll);
+                        syncVideo(index + 1);
+                    }
+                }, 100);
+            }
+            
+            await syncVideo(0);
         }
 
         // 檢查是否有藍色幽靈
@@ -283,9 +413,9 @@
                 id: Date.now().toString(),
                 youtubeId: ytId,
                 title: "讀取標題中...",
-                ghostState: 'keep', // 預設常態灰色
-                random: false,
-                duration: 0 // 真實時長等播放時取得
+                ghostState: defaultGhostState, // 2-B: 繼承預設幽靈設定
+                random: defaultRandom,         // 2-C: 繼承預設隨機設定
+                duration: 0 
             };
             
             playlist.push(newItem);
@@ -333,7 +463,7 @@
                         <i class="fas fa-grip-vertical"></i>
                     </div>
 
-                    <!-- 影片標題 -->
+                    <!-- 影片標題 (3: 包含影片名稱) -->
                     <div class="flex-grow min-w-0 cursor-pointer" onclick="loadVideo(${i})">
                         <h4 class="text-sm font-medium truncate text-slate-200" title="${v.title}">${v.title}</h4>
                     </div>
@@ -378,6 +508,7 @@
                     player.stopVideo();
                     currentIndex = -1;
                     document.getElementById('vinylCover').src = '';
+                    document.getElementById('musicModeTitle').innerText = "等待播放...";
                 }
             } else {
                 // 修正 currentIndex 偏移
@@ -388,7 +519,13 @@
             updateStats();
         }
 
-        // 初始化拖曳排序 (SortableJS)
+        // 解析 YouTube 網址工具
+        function getYTIdFromUrl(url) {
+            const match = url.match(/[?&]v=([^&]+)/) || url.match(/youtu\.be\/([^?]+)/);
+            return match ? match[1] : null;
+        }
+
+        // 綁定拖曳排序 (SortableJS)
         new Sortable(document.getElementById('playlist'), {
             animation: 150,
             handle: '.handle',
@@ -397,7 +534,7 @@
                 const item = playlist.splice(evt.oldIndex, 1)[0];
                 playlist.splice(evt.newIndex, 0, item);
                 
-                // 動態修正目前播放的 Index 以對應新位置
+                // 動態修正目前播放的 Index
                 if (currentIndex === evt.oldIndex) currentIndex = evt.newIndex;
                 else if (evt.oldIndex < currentIndex && evt.newIndex >= currentIndex) currentIndex--;
                 else if (evt.oldIndex > currentIndex && evt.newIndex <= currentIndex) currentIndex++;
@@ -406,15 +543,58 @@
             }
         });
 
+        // 綁定 2-B, 2-C: 預設設定切換
+        const defaultGhostBtn = document.getElementById('defaultGhostBtn');
+        defaultGhostBtn.onclick = () => {
+            if (defaultGhostState === 'once') {
+                defaultGhostState = 'keep';
+                defaultGhostBtn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-600 bg-slate-700/40 text-slate-300 hover:bg-slate-600/50 transition-all font-semibold";
+                defaultGhostBtn.innerHTML = '<i class="fas fa-ghost"></i> <span>預設幽靈：常態</span>';
+            } else if (defaultGhostState === 'keep') {
+                defaultGhostState = 'stealth';
+                defaultGhostBtn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/30 bg-red-900/20 text-red-400 hover:bg-red-800/40 transition-all font-semibold";
+                defaultGhostBtn.innerHTML = '<i class="fas fa-ghost"></i> <span>預設幽靈：低調避讓</span>';
+            } else {
+                defaultGhostState = 'once';
+                defaultGhostBtn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-500/30 bg-blue-900/20 text-blue-400 hover:bg-blue-800/40 transition-all font-semibold";
+                defaultGhostBtn.innerHTML = '<i class="fas fa-ghost"></i> <span>預設幽靈：一次性</span>';
+            }
+        };
+
+        const defaultRandomBtn = document.getElementById('defaultRandomBtn');
+        defaultRandomBtn.onclick = () => {
+            defaultRandom = !defaultRandom;
+            if (defaultRandom) {
+                defaultRandomBtn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-green-500/30 bg-green-900/20 text-green-400 hover:bg-green-800/40 transition-all font-semibold";
+                defaultRandomBtn.innerHTML = '<i class="fas fa-random"></i> <span>預設隨機：開</span>';
+            } else {
+                defaultRandomBtn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-500 hover:text-slate-300 transition-all font-semibold";
+                defaultRandomBtn.innerHTML = '<i class="fas fa-random"></i> <span>預設隨機：關</span>';
+            }
+        };
+
+        // 2-A: 綁定「貼上並載入」按鈕
+        document.getElementById('pasteLoadBtn').onclick = async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                const id = getYTIdFromUrl(text.trim());
+                if (id) {
+                    addToPlaylist(id);
+                } else {
+                    alert("剪貼簿中偵測不到合法的 YouTube 網址！");
+                }
+            } catch (err) {
+                alert("瀏覽器不支援或未允許存取剪貼簿，請將網址貼到輸入框再點選載入！");
+            }
+        };
+
         // 綁定載入按鈕
         document.getElementById('loadBtn').onclick = () => {
             const input = document.getElementById('videoInput');
-            // 強化正則表達式，適配更多網址格式
-            const match = input.value.match(/[?&]v=([^&]+)/) || input.value.match(/youtu\.be\/([^?]+)/);
-            const id = match ? match[1] : null;
+            const id = getYTIdFromUrl(input.value.trim());
             if(id) {
                 addToPlaylist(id);
-                input.value = ''; // 清空輸入框
+                input.value = ''; // 清空輸入
             } else {
                 alert("無效的 YouTube 網址！");
             }
@@ -423,6 +603,11 @@
         // 綁定 Enter 鍵載入
         document.getElementById('videoInput').onkeydown = (e) => {
             if (e.key === 'Enter') document.getElementById('loadBtn').click();
+        };
+
+        // 1: 綁定同步時長按鈕
+        document.getElementById('syncDurationsBtn').onclick = () => {
+            syncDurations();
         };
 
         // 綁定純享模式切換
