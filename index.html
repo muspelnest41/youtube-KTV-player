@@ -328,8 +328,22 @@
             
             if (video.ghostState === 'once') {
                 const idToRemove = video.id;
-                playNext(true); // 通知 playNext 這是因為刪除而換歌
+                
+                // 修正 BUG：必須先從清單移除藍色影片，再呼叫 playNext()
+                // 這樣 playNext 內的 hasBlueGhosts() 才會得到正確結果，並解鎖紅色的低調避讓歌曲
                 playlist = playlist.filter(x => x.id !== idToRemove);
+                
+                if (playlist.length > 0) {
+                    playNext(true); // 通知 playNext 這是因為刪除而換歌
+                } else {
+                    // 如果刪除後清單全空，則停止播放並重置狀態
+                    player.stopVideo();
+                    currentIndex = -1;
+                    document.getElementById('playbackTimer').innerText = "目前無播放";
+                    document.getElementById('musicModeTitle').innerText = "等待播放...";
+                    document.getElementById('vinylCover').src = '';
+                }
+                
                 renderPlaylist();
                 updateStats();
             } else {
